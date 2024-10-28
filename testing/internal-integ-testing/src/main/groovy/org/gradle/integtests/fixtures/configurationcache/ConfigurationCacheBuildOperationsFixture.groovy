@@ -16,18 +16,17 @@
 
 package org.gradle.integtests.fixtures.configurationcache
 
-import junit.framework.AssertionFailedError
-import org.gradle.integtests.fixtures.BuildOperationTreeQueries
-import org.gradle.internal.operations.trace.BuildOperationRecord
 
-import java.util.regex.Pattern
+import org.gradle.integtests.fixtures.BuildOperationTreeQueries
+import org.gradle.internal.configurationcache.ConfigurationCacheLoadBuildOperationType
+import org.gradle.internal.configurationcache.ConfigurationCacheStoreBuildOperationType
+import org.gradle.internal.operations.trace.BuildOperationRecord
 
 import javax.annotation.Nullable
 
 import static org.hamcrest.CoreMatchers.notNullValue
 import static org.hamcrest.CoreMatchers.nullValue
 import static org.hamcrest.MatcherAssert.assertThat
-
 
 class ConfigurationCacheBuildOperationsFixture {
 
@@ -76,19 +75,13 @@ class ConfigurationCacheBuildOperationsFixture {
 
     @Nullable
     private BuildOperationRecord loadOperation() {
-        return onlyOrNone("Load (configuration cache|instant execution) state")
+        // Build operation type is part of the contract
+        operations.singleOrNone(ConfigurationCacheLoadBuildOperationType)
     }
 
     @Nullable
     private BuildOperationRecord storeOperation() {
-        return onlyOrNone("Store (configuration cache|instant execution) state.*")
-    }
-
-    private BuildOperationRecord onlyOrNone(String regex) {
-        def ops = operations.all(Pattern.compile(regex))
-        if (ops.size() > 1) {
-            throw new AssertionFailedError("Expected at most one operation, got ${ops.size()}")
-        }
-        return ops.find()
+        // Build operation type is part of the contract
+        operations.singleOrNone(ConfigurationCacheStoreBuildOperationType)
     }
 }
