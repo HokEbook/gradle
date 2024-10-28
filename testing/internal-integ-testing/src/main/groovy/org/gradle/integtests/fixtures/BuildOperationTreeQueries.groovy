@@ -53,6 +53,14 @@ abstract class BuildOperationTreeQueries {
         return records.first()
     }
 
+    @SuppressWarnings("GrUnnecessaryPublicModifier")
+    @Nullable
+    public <T extends BuildOperationType<?, ?>> BuildOperationRecord singleOrNone(Class<T> type, Spec<? super BuildOperationRecord> predicate = Specs.satisfyAll()) {
+        def records = all(type, predicate)
+        assert records.size() <= 1
+        return records.find()
+    }
+
     @Nullable
     BuildOperationRecord first(String displayName) {
         firstMatchingRegex(Pattern.quote(displayName))
