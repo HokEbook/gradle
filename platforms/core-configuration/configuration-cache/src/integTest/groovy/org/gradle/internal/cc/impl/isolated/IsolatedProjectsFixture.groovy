@@ -37,9 +37,6 @@ class IsolatedProjectsFixture {
 
     IsolatedProjectsFixture(AbstractConfigurationCacheOptInFeatureIntegrationTest spec) {
         this.spec = spec
-        this.fixture = new ConfigurationCacheFixture(spec)
-        this.buildOperations = fixture.buildOperations
-        this.configurationCacheBuildOperations = fixture.configurationCacheBuildOperations
         this.configurationCache = new ConfigurationCacheFixture(spec)
         this.buildOperations = configurationCache.buildOperations
         this.configurationCacheBuildOperations = configurationCache.configurationCacheBuildOperations
