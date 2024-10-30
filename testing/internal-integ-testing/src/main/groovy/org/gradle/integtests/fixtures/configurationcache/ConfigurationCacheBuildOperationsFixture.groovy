@@ -37,51 +37,87 @@ class ConfigurationCacheBuildOperationsFixture {
     }
 
     boolean getReused() {
-        storeOperation() == null && loadOperation() != null
+        workGraphStoreOperation() == null && workGraphLoadOperation() != null
     }
 
     void assertStateLoaded() {
-        def load = loadOperation()
+        def load = workGraphLoadOperation()
         assertThat(load, notNullValue())
         assertThat(load.failure, nullValue())
-        assertThat(storeOperation(), nullValue())
+        assertThat(workGraphStoreOperation(), nullValue())
     }
 
     void assertStateLoadFailed() {
-        def load = loadOperation()
+        def load = workGraphLoadOperation()
         assertThat(load, notNullValue())
         assertThat(load.failure, notNullValue())
-        assertThat(storeOperation(), nullValue())
+        assertThat(workGraphStoreOperation(), nullValue())
     }
 
     void assertStateStored(boolean expectLoad = true) {
-        def store = storeOperation()
+        def store = workGraphStoreOperation()
         assertThat(store, notNullValue())
         assertThat(store.failure, nullValue())
-        assertThat(loadOperation(), expectLoad ? notNullValue() : nullValue())
+        assertThat(workGraphLoadOperation(), expectLoad ? notNullValue() : nullValue())
     }
 
     void assertStateStoreFailed() {
-        assertThat(loadOperation(), nullValue())
-        def store = storeOperation()
+        assertThat(workGraphLoadOperation(), nullValue())
+        def store = workGraphStoreOperation()
         assertThat(store, notNullValue())
         assertThat(store.failure, notNullValue())
     }
 
+    void assertModelStored() {
+        def modelStore = modelStoreOperation()
+        assert modelStore != null && modelStore.failure == null
+        assert modelLoadOperation() == null
+    }
+
+    void assertModelStoreFailed() {
+        def modelStore = modelStoreOperation()
+        assert modelStore != null && modelStore.failure != null
+        assert modelLoadOperation() == null
+    }
+
+    void assertModelLoaded() {
+        def modelLoad = modelLoadOperation()
+        assert modelLoad != null && modelLoad.failure == null
+        assert modelStoreOperation() == null
+    }
+
     void assertNoConfigurationCache() {
-        assertThat(loadOperation(), nullValue())
-        assertThat(storeOperation(), nullValue())
+        assertNoWorkGraphStore()
+        assertNoModelStore()
+    }
+
+    void assertNoWorkGraphStore() {
+        assert workGraphStoreOperation() == null
+        assert workGraphLoadOperation() == null
+    }
+
+    void assertNoModelStore() {
+        assert modelStoreOperation() == null
+        assert modelLoadOperation() == null
     }
 
     @Nullable
-    private BuildOperationRecord loadOperation() {
-        // Build operation type is part of the contract
+    private BuildOperationRecord workGraphStoreOperation() {
+        operations.singleOrNone(ConfigurationCacheStoreBuildOperationType)
+    }
+
+    @Nullable
+    private BuildOperationRecord workGraphLoadOperation() {
         operations.singleOrNone(ConfigurationCacheLoadBuildOperationType)
     }
 
     @Nullable
-    private BuildOperationRecord storeOperation() {
-        // Build operation type is part of the contract
-        operations.singleOrNone(ConfigurationCacheStoreBuildOperationType)
+    private BuildOperationRecord modelStoreOperation() {
+        operations.first("Store model in configuration cache")
+    }
+
+    @Nullable
+    private BuildOperationRecord modelLoadOperation() {
+        operations.first("Load model from configuration cache")
     }
 }

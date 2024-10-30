@@ -60,14 +60,26 @@ class IsolatedProjectsFixture {
         assertModelsQueried(details)
     }
 
+    void assertModelStored(@DelegatesTo(StoreDetails) Closure closure) {
+        def details = forModels(new StoreDetails())
+        closure.delegate = details
+        closure()
+
+        configurationCache.assertStateStored(details)
+
+        assertHasWarningThatIncubatingFeatureUsed()
+        assertProjectsConfigured(details)
+        assertModelsQueried(details)
+    }
+
     /**
      * Asserts that the cache entry was written with some problems.
      *
      * Also asserts that the expected set of projects is configured, the expected models are queried
      * and the appropriate console logging, reports and build operations are generated.
      */
-    void assertStateStoredWithProblems(@DelegatesTo(StateStoreWithProblemsDetails) Closure closure) {
-        def details = new StateStoreWithProblemsDetails()
+    void assertModelStoredWithProblems(@DelegatesTo(StateStoreWithProblemsDetails) Closure closure) {
+        def details = forModels(new StateStoreWithProblemsDetails())
         closure.delegate = details
         closure()
 
@@ -96,14 +108,26 @@ class IsolatedProjectsFixture {
         assertModelsQueried(details)
     }
 
+    void assertModelStoredAndDiscarded(@DelegatesTo(StateDiscardedWithProblemsDetails) Closure closure) {
+        def details = forModels(new StateDiscardedWithProblemsDetails())
+        closure.delegate = details
+        closure()
+
+        configurationCache.assertStateStoredAndDiscarded(details, details)
+
+        assertHasWarningThatIncubatingFeatureUsed()
+        assertProjectsConfigured(details)
+        assertModelsQueried(details)
+    }
+
     /**
      * Asserts that the cache entry was discarded and stored again with no problems.
      *
      * Also asserts that the expected set of projects is configured, the expected models are queried
      * and the appropriate console logging, reports and build operations are generated.
      */
-    void assertStateRecreated(@DelegatesTo(StoreRecreateDetails) Closure closure) {
-        def details = new StoreRecreateDetails()
+    void assertModelRecreated(@DelegatesTo(StoreRecreateDetails) Closure closure) {
+        def details = forModels(new StoreRecreateDetails())
         closure.delegate = details
         closure()
 
@@ -116,8 +140,8 @@ class IsolatedProjectsFixture {
      * Also asserts that the expected set of projects is configured, the expected models are queried
      * and the appropriate console logging, reports and build operations are generated.
      */
-    void assertStateUpdated(@DelegatesTo(StoreUpdateDetails) Closure closure) {
-        def details = new StoreUpdateDetails()
+    void assertModelUpdated(@DelegatesTo(StoreUpdateDetails) Closure closure) {
+        def details = forModels(new StoreUpdateDetails())
         closure.delegate = details
         closure()
 
@@ -130,8 +154,8 @@ class IsolatedProjectsFixture {
      * Also asserts that the expected set of projects is configured, the expected models are queried
      * and the appropriate console logging, reports and build operations are generated.
      */
-    void assertStateUpdatedWithProblems(@DelegatesTo(StoreUpdatedWithProblemsDetails) Closure closure) {
-        def details = new StoreUpdatedWithProblemsDetails()
+    void assertModelUpdatedWithProblems(@DelegatesTo(StoreUpdatedWithProblemsDetails) Closure closure) {
+        def details = forModels(new StoreUpdatedWithProblemsDetails())
         closure.delegate = details
         closure()
 
@@ -161,6 +185,13 @@ class IsolatedProjectsFixture {
      */
     void assertStateLoaded() {
         configurationCache.assertStateLoaded(new ConfigurationCacheFixture.LoadDetails())
+
+        assertHasWarningThatIncubatingFeatureUsed()
+        assertNoModelsQueried()
+    }
+
+    void assertModelLoaded() {
+        configurationCache.assertStateLoaded(forModels(new ConfigurationCacheFixture.LoadDetails()))
 
         assertHasWarningThatIncubatingFeatureUsed()
         assertNoModelsQueried()
@@ -248,6 +279,13 @@ class IsolatedProjectsFixture {
         return result
     }
 
+    private <T extends HasBuildActions> T forModels(T details) {
+        details.createsModels = true
+        details.runsTasks = false
+        details.loadsOnStore = false
+        details
+    }
+
     trait HasIntermediateDetails extends HasBuildActions {
         final projects = new HashSet<String>()
         final List<ModelRequestExpectation> models = []
@@ -265,8 +303,6 @@ class IsolatedProjectsFixture {
          * The given number of build scoped models are created.
          */
         void buildModelCreated(int count = 1) {
-            runsTasks = false
-            loadsOnStore = false
             buildModelQueries += count
         }
 
@@ -275,8 +311,6 @@ class IsolatedProjectsFixture {
          */
         void modelsCreated(String... paths) {
             projectsConfigured(paths)
-            runsTasks = false
-            loadsOnStore = false
             models.addAll(paths.collect { new ModelRequestExpectation(it, 1) })
         }
 
@@ -285,8 +319,6 @@ class IsolatedProjectsFixture {
          */
         void modelsCreated(Class<?> modelType, String... paths) {
             projectsConfigured(paths)
-            runsTasks = false
-            loadsOnStore = false
             models.addAll(paths.collect { new ModelRequestExpectation(it, [modelType.name]) })
         }
 
@@ -322,8 +354,6 @@ class IsolatedProjectsFixture {
 
         void modelsCreated(ModelRequestExpectation expectation) {
             projectsConfigured(expectation.path)
-            runsTasks = false
-            loadsOnStore = false
             models.add(expectation)
         }
 
