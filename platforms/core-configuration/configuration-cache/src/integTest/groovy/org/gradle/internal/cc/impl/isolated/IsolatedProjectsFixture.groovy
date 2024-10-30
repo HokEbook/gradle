@@ -31,7 +31,7 @@ import org.gradle.tooling.provider.model.internal.QueryToolingModelBuildOperatio
 
 class IsolatedProjectsFixture {
     private final AbstractConfigurationCacheOptInFeatureIntegrationTest spec
-    private final ConfigurationCacheFixture fixture
+    private final ConfigurationCacheFixture configurationCache
     private final BuildOperationsFixture buildOperations
     private final ConfigurationCacheBuildOperationsFixture configurationCacheBuildOperations
 
@@ -40,6 +40,9 @@ class IsolatedProjectsFixture {
         this.fixture = new ConfigurationCacheFixture(spec)
         this.buildOperations = fixture.buildOperations
         this.configurationCacheBuildOperations = fixture.configurationCacheBuildOperations
+        this.configurationCache = new ConfigurationCacheFixture(spec)
+        this.buildOperations = configurationCache.buildOperations
+        this.configurationCacheBuildOperations = configurationCache.configurationCacheBuildOperations
     }
 
     /**
@@ -53,7 +56,7 @@ class IsolatedProjectsFixture {
         closure.delegate = details
         closure()
 
-        fixture.assertStateStored(details)
+        configurationCache.assertStateStored(details)
 
         assertHasWarningThatIncubatingFeatureUsed()
         assertProjectsConfigured(details)
@@ -71,7 +74,7 @@ class IsolatedProjectsFixture {
         closure.delegate = details
         closure()
 
-        fixture.assertStateStoredWithProblems(details, details)
+        configurationCache.assertStateStoredWithProblems(details, details)
 
         assertHasWarningThatIncubatingFeatureUsed()
         assertProjectsConfigured(details)
@@ -89,7 +92,7 @@ class IsolatedProjectsFixture {
         closure.delegate = details
         closure()
 
-        fixture.assertStateStoredAndDiscarded(details, details)
+        configurationCache.assertStateStoredAndDiscarded(details, details)
 
         assertHasWarningThatIncubatingFeatureUsed()
         assertProjectsConfigured(details)
@@ -139,7 +142,7 @@ class IsolatedProjectsFixture {
     }
 
     private void doStateStored(HasBuildActions details, HasInvalidationReason invalidationDetails, HasIntermediateDetails intermediateDetails) {
-        fixture.assertStateRecreated(details, invalidationDetails)
+        configurationCache.assertStateRecreated(details, invalidationDetails)
 
         assertHasWarningThatIncubatingFeatureUsed()
         assertProjectsConfigured(intermediateDetails)
@@ -147,7 +150,7 @@ class IsolatedProjectsFixture {
     }
 
     private void doStoreWithProblems(HasBuildActions details, HasInvalidationReason invalidationDetails, HasIntermediateDetails intermediateDetails, ConfigurationCacheFixture.HasProblems problems) {
-        fixture.assertStateRecreatedWithProblems(details, invalidationDetails, problems)
+        configurationCache.assertStateRecreatedWithProblems(details, invalidationDetails, problems)
 
         assertHasWarningThatIncubatingFeatureUsed()
         assertProjectsConfigured(intermediateDetails)
@@ -160,7 +163,7 @@ class IsolatedProjectsFixture {
      * Also asserts that the appropriate console logging, reports and build operations are generated.
      */
     void assertStateLoaded() {
-        fixture.assertStateLoaded(new ConfigurationCacheFixture.LoadDetails())
+        configurationCache.assertStateLoaded(new ConfigurationCacheFixture.LoadDetails())
 
         assertHasWarningThatIncubatingFeatureUsed()
         assertNoModelsQueried()
