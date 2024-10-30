@@ -113,11 +113,11 @@ class ConfigurationCacheBuildOperationsFixture {
 
     @Nullable
     private BuildOperationRecord modelStoreOperation() {
-        operations.first("Store model in configuration cache")
+        operations.singleOrNone("Store model in configuration cache")
     }
 
     @Nullable
     private BuildOperationRecord modelLoadOperation() {
-        operations.first("Load model from configuration cache")
+        operations.singleOrNone("Load model from configuration cache")
     }
 }

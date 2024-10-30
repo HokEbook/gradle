@@ -105,6 +105,13 @@ class BuildOperationTreeFixture extends BuildOperationTreeQueries {
     }
 
     @Override
+    BuildOperationRecord singleOrNone(Pattern displayName) {
+        def records = all(displayName)
+        assert records.size() <= 1
+        return records.find()
+    }
+
+    @Override
     List<BuildOperationRecord> parentsOf(BuildOperationRecord child) {
         def parents = []
         def parentId = child.parentId

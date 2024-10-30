@@ -90,6 +90,14 @@ abstract class BuildOperationTreeQueries {
     @Nonnull
     abstract BuildOperationRecord only(Pattern displayName)
 
+    @Nullable
+    BuildOperationRecord singleOrNone(String displayName) {
+        return singleOrNone(Pattern.compile(Pattern.quote(displayName)))
+    }
+
+    @Nullable
+    abstract BuildOperationRecord singleOrNone(Pattern displayName)
+
     abstract List<BuildOperationRecord> parentsOf(BuildOperationRecord child)
 
     void none(String displayName) {
