@@ -103,12 +103,12 @@ class ConfigurationCacheBuildOperationsFixture {
 
     @Nullable
     private BuildOperationRecord workGraphStoreOperation() {
-        operations.singleOrNone(ConfigurationCacheStoreBuildOperationType)
+        operations.singleOrNone("Store configuration cache state")
     }
 
     @Nullable
     private BuildOperationRecord workGraphLoadOperation() {
-        operations.singleOrNone(ConfigurationCacheLoadBuildOperationType)
+        operations.singleOrNone("Load configuration cache state")
     }
 
     @Nullable
