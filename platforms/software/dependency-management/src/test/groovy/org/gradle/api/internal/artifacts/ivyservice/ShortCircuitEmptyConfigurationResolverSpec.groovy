@@ -29,6 +29,7 @@ import org.gradle.api.internal.attributes.AttributeDesugaring
 import org.gradle.api.internal.tasks.TaskDependencyResolveContext
 import org.gradle.api.specs.Specs
 import org.gradle.internal.component.external.model.DefaultModuleComponentIdentifier
+import org.gradle.internal.model.CalculatedValue
 import org.gradle.util.AttributeTestUtil
 import spock.lang.Specification
 
@@ -47,7 +48,7 @@ class ShortCircuitEmptyConfigurationResolverSpec extends Specification {
         resolveContext.hasDependencies() >> false
 
         when:
-        def results = dependencyResolver.resolveBuildDependencies(resolveContext)
+        def results = dependencyResolver.resolveBuildDependencies(resolveContext, Stub(CalculatedValue))
 
         then:
         def visitedArtifacts = results.visitedArtifacts
@@ -114,7 +115,7 @@ class ShortCircuitEmptyConfigurationResolverSpec extends Specification {
         resolveContext.hasDependencies() >> false
 
         when:
-        dependencyResolver.resolveBuildDependencies(resolveContext)
+        dependencyResolver.resolveBuildDependencies(resolveContext, Stub(CalculatedValue))
 
         then:
 
@@ -173,10 +174,10 @@ class ShortCircuitEmptyConfigurationResolverSpec extends Specification {
         resolveContext.hasDependencies() >> true
 
         when:
-        def results = dependencyResolver.resolveBuildDependencies(resolveContext)
+        def results = dependencyResolver.resolveBuildDependencies(resolveContext, Stub(CalculatedValue))
 
         then:
-        1 * delegate.resolveBuildDependencies(resolveContext) >> delegateResults
+        1 * delegate.resolveBuildDependencies(resolveContext, _) >> delegateResults
         results == delegateResults
     }
 

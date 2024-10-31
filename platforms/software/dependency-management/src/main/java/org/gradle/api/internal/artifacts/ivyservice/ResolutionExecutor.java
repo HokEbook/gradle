@@ -98,7 +98,6 @@ import org.gradle.api.specs.Spec;
 import org.gradle.api.specs.Specs;
 import org.gradle.cache.internal.BinaryStore;
 import org.gradle.cache.internal.Store;
-import org.gradle.internal.Describables;
 import org.gradle.internal.build.BuildState;
 import org.gradle.internal.component.model.DependencyMetadata;
 import org.gradle.internal.component.model.GraphVariantSelector;
@@ -236,7 +235,7 @@ public class ResolutionExecutor {
      *
      * @return An immutable result set, containing a subset of the graph that is sufficient to calculate the build dependencies.
      */
-    public ResolverResults resolveBuildDependencies(ResolveContext resolveContext) {
+    public ResolverResults resolveBuildDependencies(ResolveContext resolveContext, CalculatedValue<ResolverResults> futureCompleteResults) {
         ResolutionFailureCollector failureCollector = new ResolutionFailureCollector(componentSelectorConverter);
         ResolutionStrategyInternal resolutionStrategy = resolveContext.getResolutionStrategy();
         InMemoryResolutionResultBuilder resolutionResultBuilder = new InMemoryResolutionResultBuilder(resolutionStrategy.getIncludeAllSelectableVariantResults());
@@ -268,7 +267,7 @@ public class ResolutionExecutor {
             resolveContext.getConfigurationIdentity(),
             requestAttributes,
             defaultSortOrder,
-            calculatedValueContainerFactory.create(Describables.of("Full results for", resolutionHost.getDisplayName()), context -> resolveContext.getStrictResolverResults().getValue())
+            futureCompleteResults
         );
 
         ResolverResults.LegacyResolverResults legacyResolverResults = DefaultResolverResults.DefaultLegacyResolverResults.buildDependenciesResolved(

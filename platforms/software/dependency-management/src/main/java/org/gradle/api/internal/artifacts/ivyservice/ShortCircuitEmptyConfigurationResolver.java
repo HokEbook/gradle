@@ -48,6 +48,7 @@ import org.gradle.api.internal.tasks.TaskDependencyResolveContext;
 import org.gradle.api.specs.Spec;
 import org.gradle.api.specs.Specs;
 import org.gradle.internal.deprecation.DeprecationLogger;
+import org.gradle.internal.model.CalculatedValue;
 
 import java.io.File;
 import java.util.Collections;
@@ -72,9 +73,9 @@ public class ShortCircuitEmptyConfigurationResolver implements ConfigurationReso
     }
 
     @Override
-    public ResolverResults resolveBuildDependencies(ResolveContext resolveContext) {
+    public ResolverResults resolveBuildDependencies(ResolveContext resolveContext, CalculatedValue<ResolverResults> futureCompleteResults) {
         if (resolveContext.hasDependencies()) {
-            return delegate.resolveBuildDependencies(resolveContext);
+            return delegate.resolveBuildDependencies(resolveContext, futureCompleteResults);
         }
 
         resolveContext.markAsObserved();
