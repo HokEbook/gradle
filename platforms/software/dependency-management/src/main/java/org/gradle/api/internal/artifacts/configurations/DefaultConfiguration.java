@@ -620,8 +620,10 @@ public abstract class DefaultConfiguration extends AbstractFileCollection implem
             .nagUser();
 
         return new ResolutionBackedFileCollection(
-            resolutionAccess.getResults().map(resolverResults ->
-                resolverResults.getLegacyResults().getLegacyVisitedArtifactSet().select(dependencySpec)
+            new ResolutionResultProviderBackedSelectedArtifactSet(
+                resolutionAccess.getResults().map(resolverResults ->
+                    resolverResults.getLegacyResults().getLegacyVisitedArtifactSet().select(dependencySpec)
+                )
             ),
             false,
             getResolutionHost(),
