@@ -98,14 +98,18 @@ import org.gradle.api.specs.Spec;
 import org.gradle.api.specs.Specs;
 import org.gradle.cache.internal.BinaryStore;
 import org.gradle.cache.internal.Store;
+import org.gradle.internal.Describables;
 import org.gradle.internal.build.BuildState;
 import org.gradle.internal.component.model.DependencyMetadata;
 import org.gradle.internal.component.model.GraphVariantSelector;
 import org.gradle.internal.component.resolution.failure.ResolutionFailureHandler;
 import org.gradle.internal.locking.DependencyLockingGraphVisitor;
+import org.gradle.internal.model.CalculatedValue;
 import org.gradle.internal.model.CalculatedValueContainerFactory;
 import org.gradle.internal.operations.BuildOperationExecutor;
+import org.gradle.operations.dependencies.configurations.ConfigurationIdentity;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -253,17 +257,68 @@ public class ResolutionExecutor {
         VisitedGraphResults graphResults = new DefaultVisitedGraphResults(resolutionResultBuilder.getResolutionResult(), unresolvedDependencies, null);
 
         ResolutionHost resolutionHost = resolveContext.getResolutionHost();
-        VisitedArtifactSet visitedArtifacts = getVisitedArtifactSet(resolveContext, graphResults, resolutionHost, consumerSchema, artifactsBuilder.complete());
+        ImmutableAttributes requestAttributes = resolveContext.getAttributes().asImmutable();
+        ResolutionStrategy.SortOrder defaultSortOrder = resolutionStrategy.getSortOrder();
+
+        VisitedArtifactSet visitedArtifacts = getPartialVisitedArtifacts(
+            graphResults,
+            resolutionHost,
+            consumerSchema,
+            artifactsBuilder.complete(),
+            resolveContext.getConfigurationIdentity(),
+            requestAttributes,
+            defaultSortOrder,
+            calculatedValueContainerFactory.create(Describables.of("Full results for", resolutionHost.getDisplayName()), context -> resolveContext.getStrictResolverResults().getValue())
+        );
 
         ResolverResults.LegacyResolverResults legacyResolverResults = DefaultResolverResults.DefaultLegacyResolverResults.buildDependenciesResolved(
             // When resolving build dependencies, we ignore the dependencySpec, potentially capturing a greater
             // set of build dependencies than actually required. This is because it takes a lot of extra information
             // from the visited graph to properly filter artifacts by dependencySpec, and we don't want capture that when
             // calculating build dependencies.
-            dependencySpec -> visitedArtifacts.select(getImplicitSelectionSpec(resolveContext))
+            dependencySpec -> visitedArtifacts.select(getImplicitSelectionSpec(requestAttributes, defaultSortOrder))
         );
 
         return DefaultResolverResults.buildDependenciesResolved(graphResults, visitedArtifacts, legacyResolverResults);
+    }
+
+    private VisitedArtifactSet getPartialVisitedArtifacts(
+        VisitedGraphResults graphResults,
+        ResolutionHost resolutionHost,
+        ImmutableAttributesSchema consumerSchema,
+        VisitedArtifactResults artifactsResults,
+        @Nullable ConfigurationIdentity configurationIdentity,
+        ImmutableAttributes requestAttributes,
+        ResolutionStrategy.SortOrder defaultSortOrder,
+        CalculatedValue<ResolverResults> futureCompleteResults
+    ) {
+        TransformUpstreamDependenciesResolver.Factory dependenciesResolverFactory = visitedArtifacts -> new DefaultTransformUpstreamDependenciesResolver(
+            resolutionHost,
+            configurationIdentity,
+            requestAttributes,
+            defaultSortOrder,
+            graphResults,
+            visitedArtifacts,
+            futureCompleteResults,
+            domainObjectContext,
+            calculatedValueContainerFactory,
+            attributesFactory,
+            taskDependencyFactory
+        );
+
+        return new DefaultVisitedArtifactSet(
+            graphResults,
+            resolutionHost,
+            artifactsResults,
+            artifactSetResolver,
+            transformedVariantFactory,
+            dependenciesResolverFactory,
+            consumerSchema,
+            consumerProvidedVariantFinder,
+            attributesFactory,
+            attributeSchemaServices,
+            resolutionFailureHandler
+        );
     }
 
     /**
@@ -357,7 +412,18 @@ public class ResolutionExecutor {
             lockingVisitor.writeLocks();
         }
 
-        VisitedArtifactSet visitedArtifacts = getVisitedArtifactSet(resolveContext, graphResults, resolutionHost, consumerSchema, artifactsResults);
+        ImmutableAttributes requestAttributes = resolveContext.getAttributes().asImmutable();
+        ResolutionStrategy.SortOrder defaultSortOrder = resolutionStrategy.getSortOrder();
+
+        VisitedArtifactSet visitedArtifacts = getCompleteVisitedArtifacts(
+            graphResults,
+            resolutionHost,
+            consumerSchema,
+            artifactsResults,
+            resolveContext.getConfigurationIdentity(),
+            requestAttributes,
+            defaultSortOrder
+        );
 
         // Legacy results
         TransientConfigurationResultsLoader transientConfigurationResultsFactory = new TransientConfigurationResultsLoader(oldTransientModelBuilder, legacyGraphResults);
@@ -368,7 +434,7 @@ public class ResolutionExecutor {
             fileDependencyResults,
             transientConfigurationResultsFactory,
             artifactSetResolver,
-            getImplicitSelectionSpec(resolveContext)
+            getImplicitSelectionSpec(requestAttributes, defaultSortOrder)
         );
         ResolverResults.LegacyResolverResults legacyResolverResults = DefaultResolverResults.DefaultLegacyResolverResults.graphResolved(
             lenientConfiguration,
@@ -378,10 +444,11 @@ public class ResolutionExecutor {
         return DefaultResolverResults.graphResolved(graphResults, visitedArtifacts, legacyResolverResults);
     }
 
-    private static ArtifactSelectionSpec getImplicitSelectionSpec(ResolveContext resolveContext) {
-        ImmutableAttributes requestAttributes = resolveContext.getAttributes().asImmutable();
-        ResolutionStrategy.SortOrder sortOrder = resolveContext.getResolutionStrategy().getSortOrder();
-        return new ArtifactSelectionSpec(requestAttributes, Specs.satisfyAll(), false, false, sortOrder);
+    private static ArtifactSelectionSpec getImplicitSelectionSpec(
+        ImmutableAttributes requestAttributes,
+        ResolutionStrategy.SortOrder defaultSortOrder
+    ) {
+        return new ArtifactSelectionSpec(requestAttributes, Specs.satisfyAll(), false, false, defaultSortOrder);
     }
 
     private ResolvedArtifactsGraphVisitor artifactVisitorFor(DependencyArtifactsVisitor artifactsVisitor, ComponentResolvers resolvers, ImmutableAttributesSchema consumerSchema) {
@@ -396,19 +463,22 @@ public class ResolutionExecutor {
         );
     }
 
-    private VisitedArtifactSet getVisitedArtifactSet(
-        ResolveContext resolveContext,
+    private VisitedArtifactSet getCompleteVisitedArtifacts(
         VisitedGraphResults graphResults,
         ResolutionHost resolutionHost,
         ImmutableAttributesSchema consumerSchema,
-        VisitedArtifactResults artifactsResults
+        VisitedArtifactResults artifactsResults,
+        @Nullable ConfigurationIdentity configurationIdentity,
+        ImmutableAttributes requestAttributes,
+        ResolutionStrategy.SortOrder defaultSortOrder
     ) {
-        TransformUpstreamDependenciesResolver dependenciesResolver = new DefaultTransformUpstreamDependenciesResolver(
-            resolveContext.getResolutionHost(),
-            resolveContext.getConfigurationIdentity(),
-            resolveContext.getAttributes().asImmutable(),
-            resolveContext.getResolutionStrategy().getSortOrder(),
-            resolveContext.getStrictResolverResults(),
+        TransformUpstreamDependenciesResolver.Factory dependenciesResolverFactory = visitedArtifacts -> new DefaultTransformUpstreamDependenciesResolver(
+            resolutionHost,
+            configurationIdentity,
+            requestAttributes,
+            defaultSortOrder,
+            graphResults,
+            visitedArtifacts,
             domainObjectContext,
             calculatedValueContainerFactory,
             attributesFactory,
@@ -421,7 +491,7 @@ public class ResolutionExecutor {
             artifactsResults,
             artifactSetResolver,
             transformedVariantFactory,
-            dependenciesResolver,
+            dependenciesResolverFactory,
             consumerSchema,
             consumerProvidedVariantFinder,
             attributesFactory,

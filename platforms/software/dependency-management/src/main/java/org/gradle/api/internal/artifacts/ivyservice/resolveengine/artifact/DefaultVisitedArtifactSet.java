@@ -30,6 +30,11 @@ import org.gradle.internal.component.resolution.failure.ResolutionFailureHandler
 
 /**
  * Selects artifacts from all visited artifacts in a graph.
+ * <p>
+ * There is an unfortunate object cycle between a {@link VisitedArtifactSet}
+ * and a {@link TransformUpstreamDependenciesResolver}. The artifact set needs
+ * to resolve transform dependencies, and the transform dependencies resolver
+ * needs to resolve artifacts. Hopefully one day we can clean up this cycle.
  */
 public class DefaultVisitedArtifactSet implements VisitedArtifactSet {
     private final VisitedGraphResults graphResults;
@@ -45,7 +50,7 @@ public class DefaultVisitedArtifactSet implements VisitedArtifactSet {
         VisitedArtifactResults artifactsResults,
         ResolvedArtifactSetResolver artifactSetResolver,
         TransformedVariantFactory transformedVariantFactory,
-        TransformUpstreamDependenciesResolver dependenciesResolver,
+        TransformUpstreamDependenciesResolver.Factory transformUpstreamDependenciesResolverFactory,
         ImmutableAttributesSchema consumerSchema,
         ConsumerProvidedVariantFinder consumerProvidedVariantFinder,
         AttributesFactory attributesFactory,
@@ -68,7 +73,7 @@ public class DefaultVisitedArtifactSet implements VisitedArtifactSet {
         this.consumerServices = new ArtifactSelectionServices(
             artifactVariantSelector,
             transformedVariantFactory,
-            dependenciesResolver
+            transformUpstreamDependenciesResolverFactory.create(this) // Yuck
         );
     }
 
