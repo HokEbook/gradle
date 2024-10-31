@@ -409,7 +409,6 @@ public class ResolutionExecutor {
             resolveContext.getAttributes().asImmutable(),
             resolveContext.getResolutionStrategy().getSortOrder(),
             resolveContext.getStrictResolverResults(),
-            resolveContext.getResolverResults(),
             domainObjectContext,
             calculatedValueContainerFactory,
             attributesFactory,
