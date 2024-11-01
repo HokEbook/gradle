@@ -108,7 +108,6 @@ import org.gradle.internal.model.CalculatedValueContainerFactory;
 import org.gradle.internal.operations.BuildOperationExecutor;
 import org.gradle.operations.dependencies.configurations.ConfigurationIdentity;
 
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -254,43 +253,13 @@ public class ResolutionExecutor {
 
         Set<UnresolvedDependency> unresolvedDependencies = failureCollector.complete(Collections.emptySet());
         VisitedGraphResults graphResults = new DefaultVisitedGraphResults(resolutionResultBuilder.getResolutionResult(), unresolvedDependencies, null);
+        VisitedArtifactResults artifactsResults = artifactsBuilder.complete();
 
         ResolutionHost resolutionHost = resolveContext.getResolutionHost();
         ImmutableAttributes requestAttributes = resolveContext.getAttributes().asImmutable();
         ResolutionStrategy.SortOrder defaultSortOrder = resolutionStrategy.getSortOrder();
+        ConfigurationIdentity configurationIdentity = resolveContext.getConfigurationIdentity();
 
-        VisitedArtifactSet visitedArtifacts = getPartialVisitedArtifacts(
-            graphResults,
-            resolutionHost,
-            consumerSchema,
-            artifactsBuilder.complete(),
-            resolveContext.getConfigurationIdentity(),
-            requestAttributes,
-            defaultSortOrder,
-            futureCompleteResults
-        );
-
-        ResolverResults.LegacyResolverResults legacyResolverResults = DefaultResolverResults.DefaultLegacyResolverResults.buildDependenciesResolved(
-            // When resolving build dependencies, we ignore the dependencySpec, potentially capturing a greater
-            // set of build dependencies than actually required. This is because it takes a lot of extra information
-            // from the visited graph to properly filter artifacts by dependencySpec, and we don't want capture that when
-            // calculating build dependencies.
-            dependencySpec -> visitedArtifacts.select(getImplicitSelectionSpec(requestAttributes, defaultSortOrder))
-        );
-
-        return DefaultResolverResults.buildDependenciesResolved(graphResults, visitedArtifacts, legacyResolverResults);
-    }
-
-    private VisitedArtifactSet getPartialVisitedArtifacts(
-        VisitedGraphResults graphResults,
-        ResolutionHost resolutionHost,
-        ImmutableAttributesSchema consumerSchema,
-        VisitedArtifactResults artifactsResults,
-        @Nullable ConfigurationIdentity configurationIdentity,
-        ImmutableAttributes requestAttributes,
-        ResolutionStrategy.SortOrder defaultSortOrder,
-        CalculatedValue<ResolverResults> futureCompleteResults
-    ) {
         TransformUpstreamDependenciesResolver.Factory dependenciesResolverFactory = visitedArtifacts -> new DefaultTransformUpstreamDependenciesResolver(
             resolutionHost,
             configurationIdentity,
@@ -305,19 +274,17 @@ public class ResolutionExecutor {
             taskDependencyFactory
         );
 
-        return new DefaultVisitedArtifactSet(
-            graphResults,
-            resolutionHost,
-            artifactsResults,
-            artifactSetResolver,
-            transformedVariantFactory,
-            dependenciesResolverFactory,
-            consumerSchema,
-            consumerProvidedVariantFinder,
-            attributesFactory,
-            attributeSchemaServices,
-            resolutionFailureHandler
+        VisitedArtifactSet visitedArtifacts = getVisitedArtifactSet(graphResults, resolutionHost, artifactsResults, consumerSchema, dependenciesResolverFactory);
+
+        ResolverResults.LegacyResolverResults legacyResolverResults = DefaultResolverResults.DefaultLegacyResolverResults.buildDependenciesResolved(
+            // When resolving build dependencies, we ignore the dependencySpec, potentially capturing a greater
+            // set of build dependencies than actually required. This is because it takes a lot of extra information
+            // from the visited graph to properly filter artifacts by dependencySpec, and we don't want capture that when
+            // calculating build dependencies.
+            dependencySpec -> visitedArtifacts.select(getImplicitSelectionSpec(requestAttributes, defaultSortOrder))
         );
+
+        return DefaultResolverResults.buildDependenciesResolved(graphResults, visitedArtifacts, legacyResolverResults);
     }
 
     /**
@@ -413,16 +380,22 @@ public class ResolutionExecutor {
 
         ImmutableAttributes requestAttributes = resolveContext.getAttributes().asImmutable();
         ResolutionStrategy.SortOrder defaultSortOrder = resolutionStrategy.getSortOrder();
+        ConfigurationIdentity configurationIdentity = resolveContext.getConfigurationIdentity();
 
-        VisitedArtifactSet visitedArtifacts = getCompleteVisitedArtifacts(
-            graphResults,
+        TransformUpstreamDependenciesResolver.Factory dependenciesResolverFactory = visitedArtifacts -> new DefaultTransformUpstreamDependenciesResolver(
             resolutionHost,
-            consumerSchema,
-            artifactsResults,
-            resolveContext.getConfigurationIdentity(),
+            configurationIdentity,
             requestAttributes,
-            defaultSortOrder
+            defaultSortOrder,
+            graphResults,
+            visitedArtifacts,
+            domainObjectContext,
+            calculatedValueContainerFactory,
+            attributesFactory,
+            taskDependencyFactory
         );
+
+        VisitedArtifactSet visitedArtifacts = getVisitedArtifactSet(graphResults, resolutionHost, artifactsResults, consumerSchema, dependenciesResolverFactory);
 
         // Legacy results
         TransientConfigurationResultsLoader transientConfigurationResultsFactory = new TransientConfigurationResultsLoader(oldTransientModelBuilder, legacyGraphResults);
@@ -443,10 +416,7 @@ public class ResolutionExecutor {
         return DefaultResolverResults.graphResolved(graphResults, visitedArtifacts, legacyResolverResults);
     }
 
-    private static ArtifactSelectionSpec getImplicitSelectionSpec(
-        ImmutableAttributes requestAttributes,
-        ResolutionStrategy.SortOrder defaultSortOrder
-    ) {
+    private static ArtifactSelectionSpec getImplicitSelectionSpec(ImmutableAttributes requestAttributes, ResolutionStrategy.SortOrder defaultSortOrder) {
         return new ArtifactSelectionSpec(requestAttributes, Specs.satisfyAll(), false, false, defaultSortOrder);
     }
 
@@ -462,28 +432,13 @@ public class ResolutionExecutor {
         );
     }
 
-    private VisitedArtifactSet getCompleteVisitedArtifacts(
+    private VisitedArtifactSet getVisitedArtifactSet(
         VisitedGraphResults graphResults,
         ResolutionHost resolutionHost,
-        ImmutableAttributesSchema consumerSchema,
         VisitedArtifactResults artifactsResults,
-        @Nullable ConfigurationIdentity configurationIdentity,
-        ImmutableAttributes requestAttributes,
-        ResolutionStrategy.SortOrder defaultSortOrder
+        ImmutableAttributesSchema consumerSchema,
+        TransformUpstreamDependenciesResolver.Factory dependenciesResolverFactory
     ) {
-        TransformUpstreamDependenciesResolver.Factory dependenciesResolverFactory = visitedArtifacts -> new DefaultTransformUpstreamDependenciesResolver(
-            resolutionHost,
-            configurationIdentity,
-            requestAttributes,
-            defaultSortOrder,
-            graphResults,
-            visitedArtifacts,
-            domainObjectContext,
-            calculatedValueContainerFactory,
-            attributesFactory,
-            taskDependencyFactory
-        );
-
         return new DefaultVisitedArtifactSet(
             graphResults,
             resolutionHost,
