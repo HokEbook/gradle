@@ -1330,7 +1330,7 @@ public abstract class DefaultConfiguration extends AbstractFileCollection implem
     public RootComponentMetadataBuilder.RootComponentState toRootComponent() {
         warnOnInvalidInternalAPIUsage("toRootComponent()", ProperMethodUsage.RESOLVABLE);
         if (rootComponentState == null) {
-            rootComponentState = rootComponentMetadataBuilder.toRootComponent(getName());
+            rootComponentState = rootComponentMetadataBuilder.toRootComponent(this);
         }
         return rootComponentState;
     }

@@ -16,6 +16,8 @@
 
 package org.gradle.internal.component.local.model;
 
+import org.gradle.api.internal.artifacts.configurations.ConfigurationInternal;
+
 import javax.annotation.Nullable;
 import java.util.function.Consumer;
 
@@ -46,5 +48,10 @@ public interface LocalVariantGraphResolveStateFactory {
      */
     @Nullable
     LocalVariantGraphResolveState getVariantByConfigurationName(String name);
+
+    /**
+     * Produces a variant state instance from the configuration.
+     */
+    LocalVariantGraphResolveState getVariantByConfiguration(ConfigurationInternal configuration);
 
 }

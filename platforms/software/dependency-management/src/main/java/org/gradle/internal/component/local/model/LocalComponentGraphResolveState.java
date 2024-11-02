@@ -19,6 +19,7 @@ package org.gradle.internal.component.local.model;
 import org.gradle.api.Transformer;
 import org.gradle.api.artifacts.ModuleVersionIdentifier;
 import org.gradle.api.artifacts.component.ComponentIdentifier;
+import org.gradle.api.internal.artifacts.configurations.ConfigurationInternal;
 import org.gradle.internal.component.model.ComponentGraphResolveState;
 import org.gradle.internal.component.model.GraphSelectionCandidates;
 
@@ -37,6 +38,20 @@ public interface LocalComponentGraphResolveState extends ComponentGraphResolveSt
     /**
      * Get a variant derived from the configuration with the given name, or null if no such
      * variant exists.
+     *
+     * This method should only be used to fetch the root variant of a resolution. There are plans
+     * to migrate away from this method for that purpose.
+     *
+     * TODO: This is a legacy mechanism, and does not verify that the named configuration is
+     * consumable. Prefer {@link GraphSelectionCandidates#getVariantByConfigurationName(String)}.
+     *
+     * <strong>Do not use this method, as it will be removed in Gradle 9.0.</strong>
+     */
+    @Deprecated
+    LocalVariantGraphResolveState getConfigurationLegacy(ConfigurationInternal configurationName);
+
+    /**
+     * Get a variant derived from the configuration.
      *
      * This method should only be used to fetch the root variant of a resolution. There are plans
      * to migrate away from this method for that purpose.

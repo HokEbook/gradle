@@ -23,6 +23,7 @@ import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.artifacts.ModuleVersionIdentifier;
 import org.gradle.api.artifacts.component.ComponentIdentifier;
 import org.gradle.api.artifacts.result.ResolvedVariantResult;
+import org.gradle.api.internal.artifacts.configurations.ConfigurationInternal;
 import org.gradle.api.internal.artifacts.result.DefaultResolvedVariantResult;
 import org.gradle.api.internal.attributes.AttributeDesugaring;
 import org.gradle.api.internal.attributes.ImmutableAttributes;
@@ -219,6 +220,18 @@ public class DefaultLocalComponentGraphResolveState extends AbstractComponentGra
                 null
             ))
             .collect(Collectors.toList());
+    }
+
+    @Override
+    @Deprecated
+    public LocalVariantGraphResolveState getConfigurationLegacy(ConfigurationInternal configuration) {
+        return variants.computeIfAbsent(configuration.getName(), n -> {
+            LocalVariantGraphResolveState variant = variantFactory.getVariantByConfiguration(configuration);
+            if (artifactTransformer != null) {
+                return variant.copyWithTransformedArtifacts(artifactTransformer);
+            }
+            return variant;
+        });
     }
 
     @Nullable

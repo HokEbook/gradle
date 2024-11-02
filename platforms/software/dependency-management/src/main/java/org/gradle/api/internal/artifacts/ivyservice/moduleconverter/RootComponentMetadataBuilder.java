@@ -15,6 +15,7 @@
  */
 package org.gradle.api.internal.artifacts.ivyservice.moduleconverter;
 
+import org.gradle.api.internal.artifacts.configurations.ConfigurationInternal;
 import org.gradle.api.internal.artifacts.configurations.ConfigurationsProvider;
 import org.gradle.api.internal.artifacts.configurations.DependencyMetaDataProvider;
 import org.gradle.api.internal.artifacts.configurations.MutationValidator;
@@ -29,7 +30,7 @@ public interface RootComponentMetadataBuilder {
     /**
      * Build the component, caching the result. Then return the component and the variant with the given name.
      */
-    RootComponentState toRootComponent(String configurationName);
+    RootComponentState toRootComponent(ConfigurationInternal configuration);
 
     /**
      * Create a new builder, that builds a new component with a new identity and configuration set

@@ -176,6 +176,11 @@ public class LocalComponentGraphResolveStateFactory {
                 .findFirst()
                 .orElse(null);
         }
+
+        @Override
+        public LocalVariantGraphResolveState getVariantByConfiguration(ConfigurationInternal configuration) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     /**
@@ -234,6 +239,11 @@ public class LocalComponentGraphResolveStateFactory {
 
                 return createVariantState(configuration);
             });
+        }
+
+        @Override
+        public LocalVariantGraphResolveState getVariantByConfiguration(ConfigurationInternal configuration) {
+            return model.fromMutableState(p -> createVariantState(configuration));
         }
 
         private LocalVariantGraphResolveState createVariantState(ConfigurationInternal configuration) {

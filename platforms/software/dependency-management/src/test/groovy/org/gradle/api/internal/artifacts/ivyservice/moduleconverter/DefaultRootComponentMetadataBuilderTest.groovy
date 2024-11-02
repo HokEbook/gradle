@@ -62,20 +62,22 @@ class DefaultRootComponentMetadataBuilderTest extends Specification {
     def builder = builderFactory.create(StandaloneDomainObjectContext.ANONYMOUS, configurationsProvider, metaDataProvider, AttributeTestUtil.mutableSchema())
 
     def "caches root component resolve state and metadata"() {
-        configurationsProvider.findByName('conf') >> resolvable()
-        configurationsProvider.findByName('conf-2') >> resolvable()
+        def conf = resolvable()
+        def conf2 = resolvable()
+        configurationsProvider.findByName('conf') >> conf
+        configurationsProvider.findByName('conf-2') >> conf2
 
-        def root = builder.toRootComponent('conf')
+        def root = builder.toRootComponent(conf)
 
         when:
-        def sameConf = builder.toRootComponent('conf')
+        def sameConf = builder.toRootComponent(conf)
 
         then:
         sameConf.rootComponent.is(root.rootComponent)
         sameConf.rootComponent.metadata.is(root.rootComponent.metadata)
 
         when:
-        def differentConf = builder.toRootComponent('conf-2')
+        def differentConf = builder.toRootComponent(conf2)
 
         then:
         differentConf.rootComponent.is(root.rootComponent)
@@ -83,15 +85,17 @@ class DefaultRootComponentMetadataBuilderTest extends Specification {
     }
 
     def "reevaluates component metadata when #mutationType change"() {
-        configurationsProvider.findByName('root') >> resolvable()
-        configurationsProvider.findByName('conf') >> resolvable()
+        def rootConf = resolvable()
+        def confConf = resolvable()
+        configurationsProvider.findByName('root') >> rootConf
+        configurationsProvider.findByName('conf') >> confConf
 
-        def root = builder.toRootComponent('root')
+        def root = builder.toRootComponent(rootConf)
         def variant = root.rootComponent.getConfigurationLegacy('conf')
 
         when:
         builder.validator.validateMutation(mutationType)
-        def otherRoot = builder.toRootComponent('root')
+        def otherRoot = builder.toRootComponent(rootConf)
 
         then:
         root.rootComponent.is(otherRoot.rootComponent)
@@ -112,15 +116,17 @@ class DefaultRootComponentMetadataBuilderTest extends Specification {
     }
 
     def "does not reevaluate component metadata when #mutationType change"() {
-        configurationsProvider.findByName('root') >> resolvable()
-        configurationsProvider.findByName('conf') >> resolvable()
+        def rootConf = resolvable()
+        def confConf = resolvable()
+        configurationsProvider.findByName('root') >> rootConf
+        configurationsProvider.findByName('conf') >> confConf
 
-        def root = builder.toRootComponent('root')
+        def root = builder.toRootComponent(rootConf)
         def variant = root.rootComponent.getConfigurationLegacy("conf")
 
         when:
         builder.validator.validateMutation(mutationType)
-        def otherRoot = builder.toRootComponent('root')
+        def otherRoot = builder.toRootComponent(rootConf)
 
         then:
         root.rootComponent.is(otherRoot.rootComponent)
