@@ -88,6 +88,7 @@ import org.gradle.api.internal.artifacts.transform.DefaultTransformUpstreamDepen
 import org.gradle.api.internal.artifacts.transform.TransformUpstreamDependenciesResolver;
 import org.gradle.api.internal.artifacts.transform.TransformedVariantFactory;
 import org.gradle.api.internal.artifacts.type.ArtifactTypeRegistry;
+import org.gradle.api.internal.attributes.AttributeContainerInternal;
 import org.gradle.api.internal.attributes.AttributeSchemaServices;
 import org.gradle.api.internal.attributes.AttributesFactory;
 import org.gradle.api.internal.attributes.ImmutableAttributes;
@@ -233,16 +234,20 @@ public class ResolutionExecutor {
      * @return An immutable result set, containing a subset of the graph that is sufficient to calculate the build dependencies.
      */
     public ResolverResults resolveBuildDependencies(ResolveContext resolveContext) {
+
+        ResolutionHost resolutionHost = resolveContext.getResolutionHost();
+        RootComponentMetadataBuilder.RootComponentState rootComponent = resolveContext.toRootComponent();
+        ImmutableAttributes requestAttributes = rootComponent.getRootVariant().getAttributes();
+        ResolutionStrategy.SortOrder defaultSortOrder = resolveContext.getResolutionStrategy().getSortOrder();
+        ImmutableAttributesSchema consumerSchema = rootComponent.getRootComponent().getMetadata().getAttributesSchema();
+
         ResolutionFailureCollector failureCollector = new ResolutionFailureCollector(componentSelectorConverter);
         ResolutionStrategyInternal resolutionStrategy = resolveContext.getResolutionStrategy();
         InMemoryResolutionResultBuilder resolutionResultBuilder = new InMemoryResolutionResultBuilder(resolutionStrategy.getIncludeAllSelectableVariantResults());
         ResolvedLocalComponentsResultGraphVisitor localComponentsVisitor = new ResolvedLocalComponentsResultGraphVisitor(currentBuild, projectStateRegistry);
         DefaultResolvedArtifactsBuilder artifactsBuilder = new DefaultResolvedArtifactsBuilder(buildProjectDependencies);
 
-        RootComponentMetadataBuilder.RootComponentState rootComponent = resolveContext.toRootComponent();
-        ImmutableAttributesSchema consumerSchema = rootComponent.getRootComponent().getMetadata().getAttributesSchema();
-
-        ComponentResolvers resolvers = getResolvers(resolveContext, Collections.emptyList(), consumerSchema);
+        ComponentResolvers resolvers = getResolvers(resolveContext, Collections.emptyList(), consumerSchema, requestAttributes);
         DependencyGraphVisitor artifactsGraphVisitor = artifactVisitorFor(artifactsBuilder, resolvers, consumerSchema);
 
         ImmutableList<DependencyGraphVisitor> visitors = ImmutableList.of(failureCollector, resolutionResultBuilder, localComponentsVisitor, artifactsGraphVisitor);
@@ -252,15 +257,22 @@ public class ResolutionExecutor {
         Set<UnresolvedDependency> unresolvedDependencies = failureCollector.complete(Collections.emptySet());
         VisitedGraphResults graphResults = new DefaultVisitedGraphResults(resolutionResultBuilder.getResolutionResult(), unresolvedDependencies, null);
 
-        ResolutionHost resolutionHost = resolveContext.getResolutionHost();
-        VisitedArtifactSet visitedArtifacts = getVisitedArtifactSet(resolveContext, graphResults, resolutionHost, consumerSchema, artifactsBuilder.complete());
+        VisitedArtifactSet visitedArtifacts = getVisitedArtifactSet(
+            resolveContext,
+            graphResults,
+            resolutionHost,
+            consumerSchema,
+            artifactsBuilder.complete(),
+            requestAttributes,
+            defaultSortOrder
+        );
 
         ResolverResults.LegacyResolverResults legacyResolverResults = DefaultResolverResults.DefaultLegacyResolverResults.buildDependenciesResolved(
             // When resolving build dependencies, we ignore the dependencySpec, potentially capturing a greater
             // set of build dependencies than actually required. This is because it takes a lot of extra information
             // from the visited graph to properly filter artifacts by dependencySpec, and we don't want capture that when
             // calculating build dependencies.
-            dependencySpec -> visitedArtifacts.select(getImplicitSelectionSpec(resolveContext))
+            dependencySpec -> visitedArtifacts.select(getImplicitSelectionSpec(requestAttributes, defaultSortOrder))
         );
 
         return DefaultResolverResults.buildDependenciesResolved(graphResults, visitedArtifacts, legacyResolverResults);
@@ -275,7 +287,12 @@ public class ResolutionExecutor {
      * @return An immutable result set, containing the full graph of resolved components.
      */
     public ResolverResults resolveGraph(ResolveContext resolveContext, List<ResolutionAwareRepository> repositories) {
+
         ResolutionHost resolutionHost = resolveContext.getResolutionHost();
+        RootComponentMetadataBuilder.RootComponentState rootComponent = resolveContext.toRootComponent();
+        ImmutableAttributes requestAttributes = rootComponent.getRootVariant().getAttributes();
+        ResolutionStrategy.SortOrder defaultSortOrder = resolveContext.getResolutionStrategy().getSortOrder();
+        ImmutableAttributesSchema consumerSchema = rootComponent.getRootComponent().getMetadata().getAttributesSchema();
 
         StoreSet stores = storeFactory.createStoreSet();
 
@@ -306,7 +323,6 @@ public class ResolutionExecutor {
             versionConflictVisitor = new FailOnVersionConflictGraphVisitor();
             graphVisitors.add(versionConflictVisitor);
         }
-
         DependencyLockingGraphVisitor lockingVisitor = null;
         if (resolutionStrategy.isDependencyLockingEnabled()) {
             lockingVisitor = new DependencyLockingGraphVisitor(resolveContext.getDependencyLockingId(), resolutionHost.displayName(), dependencyLockingProvider);
@@ -315,10 +331,8 @@ public class ResolutionExecutor {
             dependencyLockingProvider.confirmNotLocked(resolveContext.getDependencyLockingId());
         }
 
-        RootComponentMetadataBuilder.RootComponentState rootComponent = resolveContext.toRootComponent();
-        ImmutableAttributesSchema consumerSchema = rootComponent.getRootComponent().getMetadata().getAttributesSchema();
 
-        ComponentResolvers resolvers = getResolvers(resolveContext, repositories, consumerSchema);
+        ComponentResolvers resolvers = getResolvers(resolveContext, repositories, consumerSchema, requestAttributes);
         CompositeDependencyArtifactsVisitor artifactVisitors = new CompositeDependencyArtifactsVisitor(ImmutableList.of(
             oldModelVisitor, fileDependencyVisitor, artifactsBuilder
         ));
@@ -357,7 +371,15 @@ public class ResolutionExecutor {
             lockingVisitor.writeLocks();
         }
 
-        VisitedArtifactSet visitedArtifacts = getVisitedArtifactSet(resolveContext, graphResults, resolutionHost, consumerSchema, artifactsResults);
+        VisitedArtifactSet visitedArtifacts = getVisitedArtifactSet(
+            resolveContext,
+            graphResults,
+            resolutionHost,
+            consumerSchema,
+            artifactsResults,
+            requestAttributes,
+            defaultSortOrder
+        );
 
         // Legacy results
         TransientConfigurationResultsLoader transientConfigurationResultsFactory = new TransientConfigurationResultsLoader(oldTransientModelBuilder, legacyGraphResults);
@@ -368,7 +390,7 @@ public class ResolutionExecutor {
             fileDependencyResults,
             transientConfigurationResultsFactory,
             artifactSetResolver,
-            getImplicitSelectionSpec(resolveContext)
+            getImplicitSelectionSpec(requestAttributes, defaultSortOrder)
         );
         ResolverResults.LegacyResolverResults legacyResolverResults = DefaultResolverResults.DefaultLegacyResolverResults.graphResolved(
             lenientConfiguration,
@@ -378,9 +400,7 @@ public class ResolutionExecutor {
         return DefaultResolverResults.graphResolved(graphResults, visitedArtifacts, legacyResolverResults);
     }
 
-    private static ArtifactSelectionSpec getImplicitSelectionSpec(ResolveContext resolveContext) {
-        ImmutableAttributes requestAttributes = resolveContext.getAttributes().asImmutable();
-        ResolutionStrategy.SortOrder sortOrder = resolveContext.getResolutionStrategy().getSortOrder();
+    private static ArtifactSelectionSpec getImplicitSelectionSpec(ImmutableAttributes requestAttributes, ResolutionStrategy.SortOrder sortOrder) {
         return new ArtifactSelectionSpec(requestAttributes, Specs.satisfyAll(), false, false, sortOrder);
     }
 
@@ -401,13 +421,15 @@ public class ResolutionExecutor {
         VisitedGraphResults graphResults,
         ResolutionHost resolutionHost,
         ImmutableAttributesSchema consumerSchema,
-        VisitedArtifactResults artifactsResults
+        VisitedArtifactResults artifactsResults,
+        ImmutableAttributes requestAttributes,
+        ResolutionStrategy.SortOrder defaultSortOrder
     ) {
         TransformUpstreamDependenciesResolver dependenciesResolver = new DefaultTransformUpstreamDependenciesResolver(
             resolveContext.getResolutionHost(),
             resolveContext.getConfigurationIdentity(),
-            resolveContext.getAttributes().asImmutable(),
-            resolveContext.getResolutionStrategy().getSortOrder(),
+            requestAttributes,
+            defaultSortOrder,
             resolveContext.getStrictResolverResults(),
             resolveContext.getResolverResults(),
             domainObjectContext,
@@ -482,7 +504,8 @@ public class ResolutionExecutor {
     private ComponentResolvers getResolvers(
         ResolveContext resolveContext,
         List<ResolutionAwareRepository> repositories,
-        ImmutableAttributesSchema consumerSchema
+        ImmutableAttributesSchema consumerSchema,
+        AttributeContainerInternal requestAttributes
     ) {
         List<ComponentResolvers> resolvers = new ArrayList<>(3);
         for (ResolverProviderFactory factory : resolverFactories) {
@@ -500,7 +523,7 @@ public class ResolutionExecutor {
             // We should not need to know _what_ we're resolving in order to construct a resolver for a set of repositories.
             // The request attributes and schema are used to support filtering components by attributes when using dynamic versions.
             // We should consider just removing that feature and making dynamic version selection dumber.
-            resolveContext.getAttributes(),
+            requestAttributes,
             consumerSchema
         ));
 

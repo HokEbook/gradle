@@ -188,6 +188,7 @@ public abstract class DefaultConfiguration extends AbstractFileCollection implem
     private final Set<MutationValidator> childMutationValidators = new HashSet<>();
     private final MutationValidator parentMutationValidator = DefaultConfiguration.this::validateParentMutation;
     private final RootComponentMetadataBuilder rootComponentMetadataBuilder;
+    private RootComponentMetadataBuilder.RootComponentState rootComponentState;
     private final ConfigurationsProvider configurationsProvider;
 
     private final Path identityPath;
@@ -1004,12 +1005,6 @@ public abstract class DefaultConfiguration extends AbstractFileCollection implem
         return allDependencies;
     }
 
-    @Override
-    public boolean hasDependencies() {
-        runDependencyActions();
-        return !getAllDependencies().isEmpty();
-    }
-
     private synchronized void initAllDependencies() {
         if (allDependencies != null) {
             return;
@@ -1135,6 +1130,11 @@ public abstract class DefaultConfiguration extends AbstractFileCollection implem
     @Override
     public String getDisplayName() {
         return displayName.getDisplayName();
+    }
+
+    @Override
+    public DisplayName asDescribable() {
+        return displayName;
     }
 
     @Override
@@ -1329,7 +1329,10 @@ public abstract class DefaultConfiguration extends AbstractFileCollection implem
     @Override
     public RootComponentMetadataBuilder.RootComponentState toRootComponent() {
         warnOnInvalidInternalAPIUsage("toRootComponent()", ProperMethodUsage.RESOLVABLE);
-        return rootComponentMetadataBuilder.toRootComponent(getName());
+        if (rootComponentState == null) {
+            rootComponentState = rootComponentMetadataBuilder.toRootComponent(getName());
+        }
+        return rootComponentState;
     }
 
     @Override
