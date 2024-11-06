@@ -16,10 +16,7 @@
 
 package org.gradle.integtests.fixtures.configurationcache
 
-
 import org.gradle.integtests.fixtures.BuildOperationTreeQueries
-import org.gradle.internal.configurationcache.ConfigurationCacheLoadBuildOperationType
-import org.gradle.internal.configurationcache.ConfigurationCacheStoreBuildOperationType
 import org.gradle.internal.operations.trace.BuildOperationRecord
 
 import javax.annotation.Nullable
