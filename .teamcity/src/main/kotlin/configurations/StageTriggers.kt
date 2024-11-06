@@ -67,14 +67,14 @@ class StageTrigger(
     }
 
     if (generateTriggers) {
-//        val enableTriggers = model.branch.enableVcsTriggers
+        val enableTriggers = true
         if (stage.trigger == Trigger.eachCommit) {
             triggers.vcs {
                 quietPeriodMode = VcsTrigger.QuietPeriodMode.USE_CUSTOM
                 quietPeriod = 90
                 triggerRules = triggerExcludes
                 branchFilter = model.branch.determineBranchFilter()
-                enabled = true
+                enabled = enableTriggers
             }
         } else if (stage.trigger != Trigger.never) {
             triggers.schedule {
